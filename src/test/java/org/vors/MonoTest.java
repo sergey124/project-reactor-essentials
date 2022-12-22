@@ -87,4 +87,98 @@ public class MonoTest {
                 .expectNext(name.toUpperCase())
                 .verifyComplete();
     }
+
+    @Test
+    public void monoSubscribeConsumerSubscriptionRequestN() {
+        String name = "Albert Einstein";
+        Mono<String> mono = Mono.just(name)
+                .log()
+                .map(String::toUpperCase);
+
+        mono.subscribe(
+                s -> log.info("Value {}", s),
+                Throwable::printStackTrace,
+                () -> log.info("COMPLETED"),
+                subscription -> subscription.request(5));
+
+        StepVerifier.create(mono)
+                .expectNext(name.toUpperCase())
+                .verifyComplete();
+    }
+
+    @Test
+    public void monoDoOnMethods() {
+        String name = "Albert Einstein";
+        Mono<String> mono = Mono.just(name)
+                .log()
+                .map(String::toUpperCase)
+                .doOnSubscribe(s -> log.info("Subscribed {}", s))
+                .doOnRequest(longNumber -> log.info("Requested {}", longNumber))
+                .doOnNext(s -> log.info("Executing next {}", s))
+                .doOnSuccess(s -> log.info("Success {}", s));
+
+        mono.subscribe(
+                s -> log.info("Value {}", s),
+                Throwable::printStackTrace,
+                () -> log.info("COMPLETED"));
+    }
+
+    @Test
+    public void monoDoOnMethodsEmptyNoNext() {
+        String name = "Albert Einstein";
+        Mono<Object> mono = Mono.just(name)
+                .log()
+                .map(String::toUpperCase)
+                .flatMap(s -> Mono.empty())
+                .doOnSubscribe(s -> log.info("Subscribed {}", s))
+                .doOnRequest(longNumber -> log.info("Requested {}", longNumber))
+                .doOnNext(s -> log.info("Executing next {}", s))
+                .doOnSuccess(s -> log.info("Success {}", s));
+
+        mono.subscribe(
+                s -> log.info("Value {}", s),
+                Throwable::printStackTrace,
+                () -> log.info("COMPLETED"));
+    }
+
+    @Test
+    public void monoError() {
+        Mono<String> mono = Mono.error(new IllegalArgumentException("some illegal arg"));
+
+        StepVerifier.create(mono)
+                .expectError(IllegalArgumentException.class)
+                .verify();
+    }
+
+    @Test
+    public void monoErrorResume() {
+        String name = "Richard Feynman";
+        Mono<String> mono = Mono.error(new IllegalArgumentException("some illegal arg"))
+                .onErrorResume(t -> {
+                    log.error("Resuming from error {}", t.getMessage());
+                    return Mono.just(name);
+                })
+                .map(String::valueOf);
+
+        StepVerifier.create(mono)
+                .expectNext(name)
+                .verifyComplete();
+    }
+
+    @Test
+    public void monoErrorReturn() {
+        final String NAME = "Richard Feynman";
+        final String EMPTY = "EMPTY";
+        Mono<String> mono = Mono.error(new IllegalArgumentException("some illegal arg"))
+                .onErrorReturn(EMPTY)
+                .onErrorResume(t -> {
+                    log.error("Resuming from error {}", t.getMessage());
+                    return Mono.just(NAME);
+                })
+                .map(String::valueOf);
+
+        StepVerifier.create(mono)
+                .expectNext(EMPTY)
+                .verifyComplete();
+    }
 }
